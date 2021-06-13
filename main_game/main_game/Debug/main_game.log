@@ -1,0 +1,10 @@
+﻿  game.cpp
+E:\VS progs\main_game\main_game\game.cpp(235,63): warning C4020: SDL_RenderCopy: слишком много фактических параметров
+E:\VS progs\main_game\main_game\game.cpp(234,1): warning C4244: инициализация: преобразование "float" в "int", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(269,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(270,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(271,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(272,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(366,32): warning C4133: функция: несовместимые типы - из "SDL_Renderer *" в "GameState *"
+E:\VS progs\main_game\main_game\game.cpp(366,34): warning C4020: ProcessEvents: слишком много фактических параметров
+  main_game.vcxproj -> E:\VS progs\main_game\Debug\main_game.exe
