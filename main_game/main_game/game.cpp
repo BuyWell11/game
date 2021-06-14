@@ -1,9 +1,17 @@
 #define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#pragma comment(lib, "ws2_32.lib")
+#include <WinSock2.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "SDL.h"
+#include <string.h>
+#include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>
+
+SOCKET soc;
+int player_num;
+
 
 #define SCREEN_WIDTH 1980
 #define SCREEN_HEIGHT 1080
@@ -47,7 +55,7 @@ typedef struct
 
 typedef struct
 {
-	Player player;
+	Player player[2];
 
 	Fon fons;
 
@@ -74,7 +82,27 @@ typedef struct
 SDL_Texture* bulletTexture;
 Bullet* bullets[MAX_BULLETS] = { NULL };
 
-Player enemy;
+GameState game;
+
+void ClientHandler() {
+	char msg[256];
+	char buf[20];
+	while (1) {
+		recv(soc, msg, sizeof(msg), NULL);
+		if (player_num == 0) {
+			sscanf(msg, "%s", buf);
+			game.player[1].x = atoi(buf);
+			sscanf(msg, "%s", buf);
+			game.player[1].y = atoi(buf);
+		}
+		else {
+			sscanf(msg, "%s", buf);
+			game.player[0].x = atoi(buf);
+			sscanf(msg, "%s", buf);
+			game.player[0].y = atoi(buf);
+		}
+	}
+}
 
 int globalTime = 0;
 
@@ -113,7 +141,7 @@ void Init_status_lives(GameState* game)
 {
 	SDL_Color white = { 255, 255, 255, 255 };
 
-	SDL_Surface* tmp = TTF_RenderText_Blended(game->font, "TheBestGame", white);
+	SDL_Surface* tmp = TTF_RenderText_Blended(game->font, "Waiting for second player", white);
 	game->labelW = tmp->w;
 	game->labelH = tmp->h;
 	game->label = SDL_CreateTextureFromSurface(game->renderer, tmp);
@@ -128,7 +156,7 @@ void Draw_status_lives(GameState* game)
 
 	SDL_SetRenderDrawColor(game->renderer, 255, 255, 255, 255);
 
-	SDL_Rect textRect = { 815, 540 - game->labelH, game->labelW, game->labelH };
+	SDL_Rect textRect = { 655, 540 - game->labelH, game->labelW, game->labelH };
 	SDL_RenderCopy(game->renderer, game->label, NULL, &textRect);
 }
 
@@ -138,7 +166,7 @@ void Shutdown_status_lives(GameState* game)
 	game->label = NULL;
 }
 
-void LoadGame(GameState* game)
+void LoadGame(GameState* game,int player_num)
 {
 	SDL_Surface* surface = NULL;
 
@@ -260,15 +288,41 @@ void LoadGame(GameState* game)
 	}
 
 	game->label = NULL;
+	if (player_num == 0) {
+		game->player[player_num].x = 20;
+		game->player[player_num].y = 1000;
+		game->player[1].x = 1800;
+		game->player[1].y = 765;
+		game->player[1].dy = 0;
+		game->player[1].dx = 0;
+		game->player[1].onLedge = 0;
+		game->player[1].animFrame = 0;
+		game->player[1].facingLeft = 1;
+		game->player[1].slowingDown = 0;
+		game->player[1].alive = 1;
+	}
+	else{
+		game->player[player_num].x = 1800;
+		game->player[player_num].y = 1000;
+		game->player[0].x = 20;
+		game->player[0].y = 1000;
+		game->player[0].dy = 0;
+		game->player[0].dx = 0;
+		game->player[0].onLedge = 0;
+		game->player[0].animFrame = 0;
+		game->player[0].facingLeft = 1;
+		game->player[0].slowingDown = 0;
+		game->player[0].alive = 1;
+	}
 
-	game->player.x = 20;
-	game->player.y = 1000;
-	game->player.dy = 0;
-	game->player.dx = 0;
-	game->player.onLedge = 0;
-	game->player.animFrame = 0;
-	game->player.facingLeft = 1;
-	game->player.slowingDown = 0;
+	game->player[player_num].dy = 0;
+	game->player[player_num].dx = 0;
+	game->player[player_num].onLedge = 0;
+	game->player[player_num].animFrame = 0;
+	game->player[player_num].facingLeft = 1;
+	game->player[player_num].slowingDown = 0;
+	game->player[player_num].alive = 1;
+
 	game->statusState = STATUS_STATE_LIVES;
 
 	game->fons.x = 0;
@@ -417,10 +471,10 @@ int ProcessEvents(SDL_Window* window, GameState* game)
 				done = 1;
 				break;
 			case SDLK_UP:
-				if (game->player.onLedge)
+				if (game->player[player_num].onLedge)
 				{
-					game->player.dy = -15;
-					game->player.onLedge = 0;
+					game->player[player_num].dy = -15;
+					game->player[player_num].onLedge = 0;
 				}
 				break;
 			}
@@ -436,66 +490,102 @@ int ProcessEvents(SDL_Window* window, GameState* game)
 	const Uint8* state = SDL_GetKeyboardState(NULL);
 	if (state[SDL_SCANCODE_UP])
 	{
-		game->player.dy -= 0.2f;
+		game->player[player_num].dy -= 0.2f;
+		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		char buff[20] = { 0 };
+		char msg[256] = { 0 };
+		_itoa(game->player[player_num].x, buff, 10);
+		strcat(buff, " ");
+		strcat(msg, buff);
+		_itoa(game->player[player_num].y, buff, 10);
+		strcat(msg, buff);
+		send(soc, msg, sizeof(msg), NULL);
 	}
 
 	//walking
 	if (state[SDL_SCANCODE_LEFT])
 	{
-		game->player.dx -= 3;
-		if (game->player.dx < -10)
+		game->player[player_num].dx -= 3;
+		if (game->player[player_num].dx < -10)
 		{
-			game->player.dx = -10;
+			game->player[player_num].dx = -10;
 		}
-		game->player.facingLeft = 1;
-		game->player.slowingDown = 0;
+		game->player[player_num].facingLeft = 1;
+		game->player[player_num].slowingDown = 0;
+		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		char buff[20] = { 0 };
+		char msg[256] = { 0 };
+		_itoa(game->player[player_num].x, buff, 10);
+		strcat(buff, " ");
+		strcat(msg, buff);
+		_itoa(game->player[player_num].y, buff, 10);
+		strcat(msg, buff);
+		send(soc, msg, sizeof(msg), NULL);
 	}
 	else if (state[SDL_SCANCODE_RIGHT])
 	{
-		game->player.dx += 3;
-		if (game->player.dx > 10)
+		game->player[player_num].dx += 3;
+		if (game->player[player_num].dx > 10)
 		{
-			game->player.dx = 10;
+			game->player[player_num].dx = 10;
 		}
-		game->player.facingLeft = 0;
-		game->player.slowingDown = 0;
+		game->player[player_num].facingLeft = 0;
+		game->player[player_num].slowingDown = 0;
+		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		char buff[20] = { 0 };
+		char msg[256] = { 0 };
+		_itoa(game->player[player_num].x, buff, 10);
+		strcat(buff, " ");
+		strcat(msg, buff);
+		_itoa(game->player[player_num].y, buff, 10);
+		strcat(msg, buff);
+		send(soc, msg, sizeof(msg), NULL);
 	}
 	else
 	{
-		game->player.animFrame = 0;
-		game->player.dx *= 0.8f;
-		game->player.slowingDown = 1;
-		if (fabsf(game->player.dx) < 0.1f)
+		game->player[player_num].animFrame = 0;
+		game->player[player_num].dx *= 0.8f;
+		game->player[player_num].slowingDown = 1;
+		if (fabsf(game->player[player_num].dx) < 0.1f)
 		{
-			game->player.dx = 0;
+			game->player[player_num].dx = 0;
 		}
+		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		char buff[20] = { 0 };
+		char msg[256] = { 0 };
+		_itoa(game->player[player_num].x, buff, 10);
+		strcat(buff, " ");
+		strcat(msg, buff);
+		_itoa(game->player[player_num].y, buff, 10);
+		strcat(msg, buff);
+		send(soc, msg, sizeof(msg), NULL);
 	}
 
 	if (state[SDL_SCANCODE_SPACE])// && !man->dy)
 	{
 		if (globalTime % 6 == 0)
 		{
-			if (!game->player.facingLeft)
+			if (!game->player[player_num].facingLeft)
 			{
-				addBullet(game->player.x + 100, game->player.y + 20, 10);
+				addBullet(game->player[player_num].x + 100, game->player[player_num].y + 20, 10);
 			}
 			else
 			{
-				addBullet(game->player.x + 100, game->player.y + 20, -10);
+				addBullet(game->player[player_num].x + 100, game->player[player_num].y + 20, -10);
 			}
 		}
 
-		game->player.shooting = 1;
+		game->player[player_num].shooting = 1;
 	}
 	else
 	{
-		game->player.shooting = 0;
+		game->player[player_num].shooting = 0;
 	}
 
 	return done;
 }
 
-void DoRender(SDL_Renderer* renderer, GameState* game)
+void DoRender(SDL_Renderer* renderer, GameState* game, int num)
 {
 	if (game->statusState == STATUS_STATE_LIVES)
 	{
@@ -544,10 +634,20 @@ void DoRender(SDL_Renderer* renderer, GameState* game)
 			SDL_Rect rect = { bullets[i]->x, bullets[i]->y, 30, 30 };
 			SDL_RenderCopy(renderer, bulletTexture, NULL, &rect);
 		}
-
+		if (num == 0) {
+			SDL_Rect rect = { game->player[0].x, game->player[0].y, 100, 100 };
+			SDL_RenderCopyEx(renderer, game->playerFrames[game->player[0].animFrame], NULL, &rect, 0, NULL, game->player[0].facingLeft);
+			SDL_Rect rect2 = { game->player[1].x, game->player[1].y, 100, 100 };
+			SDL_RenderCopyEx(renderer, game->playerFrames[game->player[1].animFrame], NULL, &rect2, 0, NULL, game->player[1].facingLeft);
+		}
+		else {
+			SDL_Rect rect2 = { game->player[1].x, game->player[1].y, 100, 100 };
+			SDL_RenderCopyEx(renderer, game->playerFrames[game->player[1].animFrame], NULL, &rect2, 0, NULL, game->player[1].facingLeft);
+			SDL_Rect rect = { game->player[0].x, game->player[0].y, 100, 100 };
+			SDL_RenderCopyEx(renderer, game->playerFrames[game->player[0].animFrame], NULL, &rect, 0, NULL, game->player[0].facingLeft);
+		}
 		//draw a rectangle at player's position
-		SDL_Rect rect = { game->player.x, game->player.y, 100, 100 };
-		SDL_RenderCopyEx(renderer, game->playerFrames[game->player.animFrame], NULL, &rect, 0, NULL, game->player.facingLeft);
+		
 	}
 
 	//We are done draing, 'present' or show to the screen what we've drawn
@@ -610,6 +710,15 @@ void process(GameState* game)
 		globalTime++;
 
 		player->dy += GRAVITY;
+		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		char buff[20] = { 0 };
+		char msg[256] = { 0 };
+		_itoa(game->player[player_num].x, buff, 10);
+		strcat(buff, " ");
+		strcat(msg, buff);
+		_itoa(game->player[player_num].y, buff, 10);
+		strcat(msg, buff);
+		send(soc, msg, sizeof(msg), NULL);
 	}
 
 }
@@ -621,8 +730,8 @@ void CollisionDetect(GameState* game)
 	{
 		float pw = 80;
 		float ph = 90;
-		float px = game->player.x;
-		float py = game->player.y;
+		float px = game->player[player_num].x;
+		float py = game->player[player_num].y;
 		float fx = game->ledges[i].x;
 		float fy = game->ledges[i].y;
 		float fw = game->ledges[i].w;
@@ -631,63 +740,160 @@ void CollisionDetect(GameState* game)
 		if (px + pw / 2 > fx && px + pw / 2 < fx + fw)
 		{
 			//are we bumpibg our head?
-			if (py < fy + fh && py > fy && game->player.dy < 0)
+			if (py < fy + fh && py > fy && game->player[player_num].dy < 0)
 			{
 				//correct y
-				game->player.y = fy + fh;
+				game->player[player_num].y = fy + fh;
 				py = fy + ph;
 
 				//bumped our head, stop any jump velocity
-				game->player.dy = 0;
-				game->player.onLedge = 1;
+				game->player[player_num].dy = 0;
+				game->player[player_num].onLedge = 1;
 			}
 		}
 
 		if (px + pw > fx && px < fx + fw)
 		{
 			//we are landing on the ledge
-			if (py + ph > fy && py < fy && game->player.dy > 0)
+			if (py + ph > fy && py < fy && game->player[player_num].dy > 0)
 			{
 				//correct y
-				game->player.y = fy - ph;
+				game->player[player_num].y = fy - ph;
 				py = fy - ph;
 
 				//landed on this ledge, stop any jump velocity
-				game->player.dy = 0;
-				game->player.onLedge = 1;
+				game->player[player_num].dy = 0;
+				game->player[player_num].onLedge = 1;
 			}
 		}
 
 		if (py + ph > fy && py < fy + fh)
 		{
 			//rubbing agaisnt right edge
-			if (px < fx + fw && px + pw > fx + fw && game->player.dx < 0)
+			if (px < fx + fw && px + pw > fx + fw && game->player[player_num].dx < 0)
 			{
 				//correct x
-				game->player.x = fx + fw;
+				game->player[player_num].x = fx + fw;
 				px = fx + fw;
 
-				game->player.dx = 0;
+				game->player[player_num].dx = 0;
 			}
 			//rubbing against left edge
-			else if (px + pw > fx && px < fx && game->player.dx > 0)
+			else if (px + pw > fx && px < fx && game->player[player_num].dx > 0)
 			{
 				//correct x
-				game->player.x = fx - pw;
+				game->player[player_num].x = fx - pw;
 				px = fx - pw;
 
-				game->player.dx = 0;
+				game->player[player_num].dx = 0;
 			}
 		}
 	}
 }
 
+void CollisionDetect2(GameState* game,int enemy_id)
+{
+	//Check for collision with any ledges
+	for (int i = 0; i < 100; i++)
+	{
+		float pw = 80;
+		float ph = 90;
+		float px = game->player[enemy_id].x;
+		float py = game->player[enemy_id].y;
+		float fx = game->ledges[i].x;
+		float fy = game->ledges[i].y;
+		float fw = game->ledges[i].w;
+		float fh = game->ledges[i].h;
+
+		if (px + pw / 2 > fx && px + pw / 2 < fx + fw)
+		{
+			//are we bumpibg our head?
+			if (py < fy + fh && py > fy && game->player[enemy_id].dy < 0)
+			{
+				//correct y
+				game->player[enemy_id].y = fy + fh;
+				py = fy + ph;
+
+				//bumped our head, stop any jump velocity
+				game->player[enemy_id].dy = 0;
+				game->player[enemy_id].onLedge = 1;
+			}
+		}
+
+		if (px + pw > fx && px < fx + fw)
+		{
+			//we are landing on the ledge
+			if (py + ph > fy && py < fy && game->player[enemy_id].dy > 0)
+			{
+				//correct y
+				game->player[enemy_id].y = fy - ph;
+				py = fy - ph;
+
+				//landed on this ledge, stop any jump velocity
+				game->player[enemy_id].dy = 0;
+				game->player[enemy_id].onLedge = 1;
+			}
+		}
+
+		if (py + ph > fy && py < fy + fh)
+		{
+			//rubbing agaisnt right edge
+			if (px < fx + fw && px + pw > fx + fw && game->player[enemy_id].dx < 0)
+			{
+				//correct x
+				game->player[enemy_id].x = fx + fw;
+				px = fx + fw;
+
+				game->player[enemy_id].dx = 0;
+			}
+			//rubbing against left edge
+			else if (px + pw > fx && px < fx && game->player[enemy_id].dx > 0)
+			{
+				//correct x
+				game->player[enemy_id].x = fx - pw;
+				px = fx - pw;
+
+				game->player[enemy_id].dx = 0;
+			}
+		}
+	}
+}
+
+
 #undef main
 int main(int argc, char* args[])
 {
-	GameState game;
+	
 	SDL_Window* window = NULL;
 	SDL_Renderer* renderer = NULL;
+
+	WSADATA ws;
+	WSAStartup(MAKEWORD(2, 2), &ws);
+
+	soc = socket(AF_INET, SOCK_STREAM, 0);
+
+	SOCKADDR_IN sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sin_family = AF_INET;
+	sa.sin_port = htons(8800);
+
+	sa.sin_addr.S_un.S_addr = inet_addr("192.168.3.10");
+
+	if (connect(soc, (const SOCKADDR*)&sa, sizeof(sa)) != 0) {
+		printf("error to connect");
+	}
+	else {
+		printf("connected");
+	}
+	char buf[100] = { 0 };
+	recv(soc, buf, sizeof(buf), NULL);
+	player_num = atoi(buf);
+	printf("Are u number %d\n", player_num);
+
+	int enemy_id = 0;
+	if (player_num == 0) {
+		enemy_id = 1;
+	}
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 
@@ -704,20 +910,31 @@ int main(int argc, char* args[])
 	//Initialize font system
 	TTF_Init();
 
-	LoadGame(&game);
+	LoadGame(&game,player_num);
 
 	int done = 0;
 
 	while (!done)
 	{
+		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		char buff[20] = { 0 };
+		char msg[256] = { 0 };
+		_itoa(game.player[player_num].x, buff, 10);
+		strcat(buff, " ");
+		strcat(msg, buff);
+		_itoa(game.player[player_num].y, buff, 10);
+		strcat(msg, buff);
+		send(soc, msg, sizeof(msg), NULL);
+
 		//Check for events
 		done = ProcessEvents(window, &game);
 
 		process(&game);
 		CollisionDetect(&game);
+		CollisionDetect2(&game, enemy_id);
 
 		//render display
-		DoRender(renderer, &game);
+		DoRender(renderer, &game,player_num);
 
 		/*SDL_Delay(10);*/
 	}
