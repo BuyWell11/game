@@ -149,6 +149,7 @@
   <ItemGroup>
     <Image Include="..\player.png" />
     <Image Include="box.png" />
+    <Image Include="bullet.png" />
     <Image Include="floor.png" />
     <Image Include="fon.png" />
     <Image Include="going1.png" />
@@ -157,6 +158,7 @@
     <Image Include="going4.png" />
     <Image Include="idle.png" />
     <Image Include="platform.png" />
+    <Image Include="sheet.png" />
     <Image Include="ustup.png" />
   </ItemGroup>
   <ItemGroup>

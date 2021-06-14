@@ -53,6 +53,12 @@
     <Image Include="box.png">
       <Filter>Файлы ресурсов</Filter>
     </Image>
+    <Image Include="sheet.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="bullet.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <Font Include="game_font.ttf" />

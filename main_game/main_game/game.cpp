@@ -13,6 +13,8 @@
 #define STATUS_STATE_GAME 1
 #define STATUS_STATE_GAMEOVER 2
 
+#define MAX_BULLETS 1000
+
 typedef struct
 {
 	float x;
@@ -21,6 +23,8 @@ typedef struct
 	short life;
 	char* name;
 	int onLedge;
+	int walking, shooting, visible;
+	int alive;
 
 	int animFrame, facingLeft, slowingDown;
 }Player;
@@ -30,6 +34,11 @@ typedef struct
 	int x;
 	int y;
 }Fon;
+
+typedef struct
+{
+	float x, y, dx;
+} Bullet;
 
 typedef struct
 {
@@ -62,6 +71,44 @@ typedef struct
 	TTF_Font* font;
 }GameState;
 
+SDL_Texture* bulletTexture;
+Bullet* bullets[MAX_BULLETS] = { NULL };
+
+Player enemy;
+
+int globalTime = 0;
+
+void addBullet(float x, float y, float dx)
+{
+	int found = -1;
+	for (int i = 0; i < MAX_BULLETS; i++)
+	{
+		if (bullets[i] == NULL)
+		{
+			found = i;
+			break;
+		}
+	}
+
+	if (found >= 0)
+	{
+		int i = found;
+		bullets[i] = malloc(sizeof(Bullet));
+		bullets[i]->x = x-60;
+		bullets[i]->y = y+23;
+		bullets[i]->dx = dx;
+	}
+}
+
+void removeBullet(int i)
+{
+	if (bullets[i])
+	{
+		free(bullets[i]);
+		bullets[i] = NULL;
+	}
+}
+
 void Init_status_lives(GameState* game)
 {
 	SDL_Color white = { 255, 255, 255, 255 };
@@ -81,7 +128,7 @@ void Draw_status_lives(GameState* game)
 
 	SDL_SetRenderDrawColor(game->renderer, 255, 255, 255, 255);
 
-	SDL_Rect textRect = { 815, 540-game->labelH, game->labelW, game->labelH };
+	SDL_Rect textRect = { 815, 540 - game->labelH, game->labelW, game->labelH };
 	SDL_RenderCopy(game->renderer, game->label, NULL, &textRect);
 }
 
@@ -94,6 +141,18 @@ void Shutdown_status_lives(GameState* game)
 void LoadGame(GameState* game)
 {
 	SDL_Surface* surface = NULL;
+
+	surface = IMG_Load("bullet.png");
+
+	if (!surface)
+	{
+		printf("Cannot find bullet.png!\n\n");
+		SDL_Quit();
+		exit(1);
+	}
+
+	bulletTexture = SDL_CreateTextureFromSurface(game->renderer, surface);
+	SDL_FreeSurface(surface);
 
 	surface = IMG_Load("box.png");
 	if (surface == NULL)
@@ -225,7 +284,7 @@ void LoadGame(GameState* game)
 		game->ledges[i].w = 256;
 		game->ledges[i].h = 64;
 		game->ledges[i].x = i * 256;
-		game->ledges[i].y = 1080-64;
+		game->ledges[i].y = 1080 - 64;
 	}
 
 	//left wall
@@ -239,7 +298,7 @@ void LoadGame(GameState* game)
 	game->ledges[12].h = 1080;
 	game->ledges[12].x = 1950;
 	game->ledges[12].y = 0;
-	
+
 	//ustup
 	game->ledges[15].w = 120;
 	game->ledges[15].h = 180;
@@ -328,10 +387,10 @@ void LoadGame(GameState* game)
 //useful utility function to see if two rectangles are colliding at all
 int collided(float x1, float y1, float x2, float y2, float wt1, float ht1, float wt2, float ht2)
 {
-	return (!((x1 > (x2+wt2) || (x2 > (x1 + wt1)) || (y1 + ht2)) || (y2 > (y1 + ht1))));
+	return (!((x1 > (x2 + wt2) || (x2 > (x1 + wt1)) || (y1 + ht2)) || (y2 > (y1 + ht1))));
 }
 
-int ProcessEvents(SDL_Window* window, GameState *game)
+int ProcessEvents(SDL_Window* window, GameState* game)
 {
 	SDL_Event event;
 	int done = 0;
@@ -374,7 +433,7 @@ int ProcessEvents(SDL_Window* window, GameState *game)
 	}
 
 	//more jumping
-	const Uint8 *state = SDL_GetKeyboardState(NULL);
+	const Uint8* state = SDL_GetKeyboardState(NULL);
 	if (state[SDL_SCANCODE_UP])
 	{
 		game->player.dy -= 0.2f;
@@ -410,6 +469,27 @@ int ProcessEvents(SDL_Window* window, GameState *game)
 		{
 			game->player.dx = 0;
 		}
+	}
+
+	if (state[SDL_SCANCODE_SPACE])// && !man->dy)
+	{
+		if (globalTime % 6 == 0)
+		{
+			if (!game->player.facingLeft)
+			{
+				addBullet(game->player.x + 100, game->player.y + 20, 10);
+			}
+			else
+			{
+				addBullet(game->player.x + 100, game->player.y + 20, -10);
+			}
+		}
+
+		game->player.shooting = 1;
+	}
+	else
+	{
+		game->player.shooting = 0;
 	}
 
 	return done;
@@ -459,6 +539,12 @@ void DoRender(SDL_Renderer* renderer, GameState* game)
 			SDL_RenderCopy(renderer, game->box, NULL, &boxRect);
 		}
 
+		for (int i = 0; i < MAX_BULLETS; i++) if (bullets[i])
+		{
+			SDL_Rect rect = { bullets[i]->x, bullets[i]->y, 30, 30 };
+			SDL_RenderCopy(renderer, bulletTexture, NULL, &rect);
+		}
+
 		//draw a rectangle at player's position
 		SDL_Rect rect = { game->player.x, game->player.y, 100, 100 };
 		SDL_RenderCopyEx(renderer, game->playerFrames[game->player.animFrame], NULL, &rect, 0, NULL, game->player.facingLeft);
@@ -486,36 +572,46 @@ void process(GameState* game)
 		player->x += player->dx;
 		player->y += player->dy;
 
-		//if (player->dx != 0 && player->onLedge && !player->slowingDown)
-		//{
-		//	if (game->time % 2 == 0)
-		//	{
-		//		if (player->animFrame == 0)
-		//		{
-		//			player->animFrame = 1;
-		//		}
-		//		else if (player->animFrame == 1)
-		//		{
-		//			player->animFrame = 2;
-		//		}
-		//		else if (player->animFrame == 2)
-		//		{
-		//			player->animFrame == 3;
-		//		}
-		//		else if (player->animFrame == 3)
-		//		{
-		//			player->animFrame == 4;
-		//		}
-		//		else
-		//		{
-		//			player->animFrame == 0;
-		//		}
-		//	}
-		//}
+		if (player->dx != 0 && player->onLedge && !player->slowingDown)
+		{
+			if (game->time % 8 == 0)
+			{
+				if (player->animFrame == 0)
+				{
+					player->animFrame = 1;
+				}
+				else if (player->animFrame == 1)
+				{
+					player->animFrame = 2;
+				}
+				else if (player->animFrame == 2)
+				{
+					player->animFrame == 3;
+				}
+				else if (player->animFrame == 3)
+				{
+					player->animFrame == 4;
+				}
+				else
+				{
+					player->animFrame == 0;
+				}
+			}
+		}
+
+		for (int i = 0; i < MAX_BULLETS; i++) if (bullets[i])
+		{
+			bullets[i]->x += bullets[i]->dx;
+
+			if (bullets[i]->x < -2000 || bullets[i]->x > 2000)
+				removeBullet(i);
+		}
+
+		globalTime++;
 
 		player->dy += GRAVITY;
 	}
-	
+
 }
 
 void CollisionDetect(GameState* game)
@@ -596,11 +692,11 @@ int main(int argc, char* args[])
 	SDL_Init(SDL_INIT_EVERYTHING);
 
 	window = SDL_CreateWindow("TheBestGame",
-								SDL_WINDOWPOS_UNDEFINED, // x
-								SDL_WINDOWPOS_UNDEFINED, // y
-								SCREEN_WIDTH, //ширина
-								SCREEN_HEIGHT, //высота
-								SDL_WINDOW_SHOWN); //Задаём окно
+		SDL_WINDOWPOS_UNDEFINED, // x
+		SDL_WINDOWPOS_UNDEFINED, // y
+		SCREEN_WIDTH, //ширина
+		SCREEN_HEIGHT, //высота
+		SDL_WINDOW_SHOWN);
 
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	game.renderer = renderer;

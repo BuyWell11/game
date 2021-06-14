@@ -1,7 +1,11 @@
 ﻿  game.cpp
-E:\VS progs\main_game\main_game\game.cpp(463,1): warning C4244: инициализация: преобразование "float" в "int", возможна потеря данных
-E:\VS progs\main_game\main_game\game.cpp(530,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
-E:\VS progs\main_game\main_game\game.cpp(531,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
-E:\VS progs\main_game\main_game\game.cpp(532,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
-E:\VS progs\main_game\main_game\game.cpp(533,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(544,1): warning C4244: инициализация: преобразование "float" в "int", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(549,1): warning C4244: инициализация: преобразование "float" в "int", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(589,24): warning C4553: "==": результат выражения не используется; вы хотели использовать "="?
+E:\VS progs\main_game\main_game\game.cpp(593,24): warning C4553: "==": результат выражения не используется; вы хотели использовать "="?
+E:\VS progs\main_game\main_game\game.cpp(597,24): warning C4553: "==": результат выражения не используется; вы хотели использовать "="?
+E:\VS progs\main_game\main_game\game.cpp(626,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(627,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(628,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
+E:\VS progs\main_game\main_game\game.cpp(629,1): warning C4244: инициализация: преобразование "int" в "float", возможна потеря данных
   main_game.vcxproj -> E:\VS progs\main_game\Debug\main_game.exe
