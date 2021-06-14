@@ -96,7 +96,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>E:\libs\SDL2-2.0.14\lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;SDL2_ttf.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -148,12 +148,19 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\player.png" />
+    <Image Include="box.png" />
     <Image Include="floor.png" />
+    <Image Include="fon.png" />
     <Image Include="going1.png" />
     <Image Include="going2.png" />
     <Image Include="going3.png" />
     <Image Include="going4.png" />
     <Image Include="idle.png" />
+    <Image Include="platform.png" />
+    <Image Include="ustup.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Font Include="game_font.ttf" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -3,10 +3,15 @@
 #include <stdlib.h>
 #include "SDL.h"
 #include <SDL_image.h>
+#include <SDL_ttf.h>
 
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
-#define GRAVITY 0.35f
+#define SCREEN_WIDTH 1980
+#define SCREEN_HEIGHT 1080
+#define GRAVITY 0.65f
+
+#define STATUS_STATE_LIVES 0
+#define STATUS_STATE_GAME 1
+#define STATUS_STATE_GAMEOVER 2
 
 typedef struct
 {
@@ -16,13 +21,15 @@ typedef struct
 	short life;
 	char* name;
 	int onLedge;
+
+	int animFrame, facingLeft, slowingDown;
 }Player;
 
 typedef struct
 {
 	int x;
 	int y;
-}Bear;
+}Fon;
 
 typedef struct
 {
@@ -33,31 +40,92 @@ typedef struct
 {
 	Player player;
 
-	Bear bears[100];
+	Fon fons;
 
 	Ledge ledges[100];
 
-	SDL_Texture* bear;
+	//images
 	SDL_Texture* playerFrames[5];
 	SDL_Texture* floor;
+	SDL_Texture* label;
+	SDL_Texture* ustup;
+	SDL_Texture* fon;
+	SDL_Texture* platform;
+	SDL_Texture* box;
+	int labelW, labelH;
+
+	int time;
+	int statusState;
 
 	SDL_Renderer* renderer;
+
+	TTF_Font* font;
 }GameState;
 
-void LoadGame(GameState *game)
+void Init_status_lives(GameState* game)
+{
+	SDL_Color white = { 255, 255, 255, 255 };
+
+	SDL_Surface* tmp = TTF_RenderText_Blended(game->font, "TheBestGame", white);
+	game->labelW = tmp->w;
+	game->labelH = tmp->h;
+	game->label = SDL_CreateTextureFromSurface(game->renderer, tmp);
+	SDL_FreeSurface(tmp);
+}
+
+void Draw_status_lives(GameState* game)
+{
+	SDL_SetRenderDrawColor(game->renderer, 0, 0, 0, 255);
+
+	SDL_RenderClear(game->renderer);
+
+	SDL_SetRenderDrawColor(game->renderer, 255, 255, 255, 255);
+
+	SDL_Rect textRect = { 815, 540-game->labelH, game->labelW, game->labelH };
+	SDL_RenderCopy(game->renderer, game->label, NULL, &textRect);
+}
+
+void Shutdown_status_lives(GameState* game)
+{
+	SDL_DestroyTexture(game->label);
+	game->label = NULL;
+}
+
+void LoadGame(GameState* game)
 {
 	SDL_Surface* surface = NULL;
 
-	//load images and create rendering textures from them
-	surface = IMG_Load("player.png");
+	surface = IMG_Load("box.png");
 	if (surface == NULL)
 	{
-		printf("Cannot find player.png!\n\n");
+		printf("Cannot find box.png!\n\n");
 		SDL_Quit();
 		exit(1);
 	}
 
-	game->bear = SDL_CreateTextureFromSurface(game->renderer, surface);
+	game->box = SDL_CreateTextureFromSurface(game->renderer, surface);
+	SDL_FreeSurface(surface);
+
+	surface = IMG_Load("platform.png");
+	if (surface == NULL)
+	{
+		printf("Cannot find platform.png!\n\n");
+		SDL_Quit();
+		exit(1);
+	}
+
+	game->platform = SDL_CreateTextureFromSurface(game->renderer, surface);
+	SDL_FreeSurface(surface);
+
+	surface = IMG_Load("fon.png");
+	if (surface == NULL)
+	{
+		printf("Cannot find fon.png!\n\n");
+		SDL_Quit();
+		exit(1);
+	}
+
+	game->fon = SDL_CreateTextureFromSurface(game->renderer, surface);
 	SDL_FreeSurface(surface);
 
 	surface = IMG_Load("idle.png");
@@ -119,28 +187,148 @@ void LoadGame(GameState *game)
 	game->floor = SDL_CreateTextureFromSurface(game->renderer, surface);
 	SDL_FreeSurface(surface);
 
-	game->player.x = 220;
-	game->player.y = 140;
+	surface = IMG_Load("ustup.png");
+	game->ustup = SDL_CreateTextureFromSurface(game->renderer, surface);
+	SDL_FreeSurface(surface);
+
+	//load fonts
+	game->font = TTF_OpenFont("game_font.ttf", 48);
+	if (!game->font)
+	{
+		printf("Cannot find out font file!\n\n");
+		SDL_Quit();
+		exit(1);
+	}
+
+	game->label = NULL;
+
+	game->player.x = 20;
+	game->player.y = 1000;
 	game->player.dy = 0;
 	game->player.dx = 0;
 	game->player.onLedge = 0;
+	game->player.animFrame = 0;
+	game->player.facingLeft = 1;
+	game->player.slowingDown = 0;
+	game->statusState = STATUS_STATE_LIVES;
 
-	for (int i = 0; i < 100; ++i)
-	{
-		game->bears[i].x = i * 64;
-		game->bears[i].y = i * 32;
-	}
+	game->fons.x = 0;
+	game->fons.y = 0;
+
+	Init_status_lives(game);
+
+	game->time = 0;
 
 	//init ledges
 	for (int i = 0; i < 100; i++)
 	{
 		game->ledges[i].w = 256;
 		game->ledges[i].h = 64;
-		game->ledges[i].x = i*256;
-		game->ledges[i].y = 400;
+		game->ledges[i].x = i * 256;
+		game->ledges[i].y = 1080-64;
 	}
-	game->ledges[99].x = 350;
-	game->ledges[99].y = 200;
+
+	//left wall
+	game->ledges[11].w = 1;
+	game->ledges[11].h = 1080;
+	game->ledges[11].x = 10;
+	game->ledges[11].y = 0;
+
+	//right wall
+	game->ledges[12].w = 1;
+	game->ledges[12].h = 1080;
+	game->ledges[12].x = 1950;
+	game->ledges[12].y = 0;
+	
+	//ustup
+	game->ledges[15].w = 120;
+	game->ledges[15].h = 180;
+	game->ledges[15].x = 200;
+	game->ledges[15].y = 845;
+
+	game->ledges[16].w = 120;
+	game->ledges[16].h = 180;
+	game->ledges[16].x = 1660;
+	game->ledges[16].y = 845;
+
+	//platforms
+	game->ledges[17].w = 140;
+	game->ledges[17].h = 50;
+	game->ledges[17].x = 430;
+	game->ledges[17].y = 720;
+
+	game->ledges[18].w = 140;
+	game->ledges[18].h = 50;
+	game->ledges[18].x = 230;
+	game->ledges[18].y = 520;
+
+	game->ledges[19].w = 140;
+	game->ledges[19].h = 50;
+	game->ledges[19].x = 660;
+	game->ledges[19].y = 440;
+
+	game->ledges[20].w = 140;
+	game->ledges[20].h = 50;
+	game->ledges[20].x = 1360;
+	game->ledges[20].y = 720;
+
+	game->ledges[21].w = 140;
+	game->ledges[21].h = 50;
+	game->ledges[21].x = 1160;
+	game->ledges[21].y = 470;
+
+	game->ledges[22].w = 140;
+	game->ledges[22].h = 50;
+	game->ledges[22].x = 1160;
+	game->ledges[22].y = 470;
+
+	game->ledges[22].w = 140;
+	game->ledges[22].h = 50;
+	game->ledges[22].x = 1680;
+	game->ledges[22].y = 580;
+
+	game->ledges[23].w = 140;
+	game->ledges[23].h = 50;
+	game->ledges[23].x = 925;
+	game->ledges[23].y = 250;
+
+	//boxes
+	game->ledges[24].w = 55;
+	game->ledges[24].h = 55;
+	game->ledges[24].x = 665;
+	game->ledges[24].y = 963;
+
+	game->ledges[25].w = 55;
+	game->ledges[25].h = 55;
+	game->ledges[25].x = 720;
+	game->ledges[25].y = 963;
+
+	game->ledges[26].w = 55;
+	game->ledges[26].h = 55;
+	game->ledges[26].x = 692;
+	game->ledges[26].y = 909;
+
+	game->ledges[27].w = 55;
+	game->ledges[27].h = 55;
+	game->ledges[27].x = 1145;
+	game->ledges[27].y = 963;
+
+	game->ledges[28].w = 55;
+	game->ledges[28].h = 55;
+	game->ledges[28].x = 1200;
+	game->ledges[28].y = 963;
+
+	game->ledges[29].w = 55;
+	game->ledges[29].h = 55;
+	game->ledges[29].x = 1145;
+	game->ledges[29].y = 908;
+
+}
+
+//useful utility function to see if two rectangles are colliding at all
+int collided(float x1, float y1, float x2, float y2, float wt1, float ht1, float wt2, float ht2)
+{
+	return (!((x1 > (x2+wt2) || (x2 > (x1 + wt1)) || (y1 + ht2)) || (y2 > (y1 + ht1))));
 }
 
 int ProcessEvents(SDL_Window* window, GameState *game)
@@ -185,7 +373,14 @@ int ProcessEvents(SDL_Window* window, GameState *game)
 		}
 	}
 
+	//more jumping
 	const Uint8 *state = SDL_GetKeyboardState(NULL);
+	if (state[SDL_SCANCODE_UP])
+	{
+		game->player.dy -= 0.2f;
+	}
+
+	//walking
 	if (state[SDL_SCANCODE_LEFT])
 	{
 		game->player.dx -= 3;
@@ -193,18 +388,24 @@ int ProcessEvents(SDL_Window* window, GameState *game)
 		{
 			game->player.dx = -10;
 		}
+		game->player.facingLeft = 1;
+		game->player.slowingDown = 0;
 	}
-	if (state[SDL_SCANCODE_RIGHT])
+	else if (state[SDL_SCANCODE_RIGHT])
 	{
 		game->player.dx += 3;
 		if (game->player.dx > 10)
 		{
 			game->player.dx = 10;
 		}
+		game->player.facingLeft = 0;
+		game->player.slowingDown = 0;
 	}
 	else
 	{
+		game->player.animFrame = 0;
 		game->player.dx *= 0.8f;
+		game->player.slowingDown = 1;
 		if (fabsf(game->player.dx) < 0.1f)
 		{
 			game->player.dx = 0;
@@ -214,47 +415,107 @@ int ProcessEvents(SDL_Window* window, GameState *game)
 	return done;
 }
 
-void DoRender(SDL_Renderer *renderer, GameState* game)
+void DoRender(SDL_Renderer* renderer, GameState* game)
 {
-	//set the drawing color to blue
-	SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-
-	//clear the screen (to blue)
-	SDL_RenderClear(renderer);
-
-	//set the drawing color to white
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-
-	for (int i = 0; i < 100; i++)
+	if (game->statusState == STATUS_STATE_LIVES)
 	{
-		SDL_Rect ledgeRect = { game->ledges[i].x, game->ledges[i].y, game->ledges[i].w, game->ledges[i].h };
-		SDL_RenderCopy(renderer, game->floor, NULL, &ledgeRect);
+		Draw_status_lives(game);
+	}
+	else if (game->statusState == STATUS_STATE_GAME)
+	{
+		//set the drawing color to blue
+		SDL_SetRenderDrawColor(renderer, 128, 128, 255, 255);
+
+		//clear the screen (to blue)
+		SDL_RenderClear(renderer);
+
+		//set the drawing color to white
+		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+
+		SDL_Rect fonRect = { game->fons.x, game->fons.y, 1960, 1080 };
+		SDL_RenderCopy(renderer, game->fon, NULL, &fonRect);
+
+		for (int i = 0; i < 15; i++)
+		{
+			SDL_Rect ledgeRect = { game->ledges[i].x, game->ledges[i].y, game->ledges[i].w, game->ledges[i].h };
+			SDL_RenderCopy(renderer, game->floor, NULL, &ledgeRect);
+		}
+
+		for (int i = 15; i < 17; i++)
+		{
+			SDL_Rect ustupRect = { game->ledges[i].x, game->ledges[i].y, game->ledges[i].w, game->ledges[i].h };
+			SDL_RenderCopy(renderer, game->ustup, NULL, &ustupRect);
+		}
+
+		for (int i = 17; i < 24; i++)
+		{
+			SDL_Rect platformRect = { game->ledges[i].x, game->ledges[i].y, game->ledges[i].w, game->ledges[i].h };
+			SDL_RenderCopy(renderer, game->platform, NULL, &platformRect);
+		}
+
+		for (int i = 24; i < 100; i++)
+		{
+			SDL_Rect boxRect = { game->ledges[i].x, game->ledges[i].y, game->ledges[i].w, game->ledges[i].h };
+			SDL_RenderCopy(renderer, game->box, NULL, &boxRect);
+		}
+
+		//draw a rectangle at player's position
+		SDL_Rect rect = { game->player.x, game->player.y, 100, 100 };
+		SDL_RenderCopyEx(renderer, game->playerFrames[game->player.animFrame], NULL, &rect, 0, NULL, game->player.facingLeft);
 	}
 
-	SDL_Rect rect = { game->player.x, game->player.y, 100, 100 };
-	SDL_RenderCopy(renderer, game->playerFrames[0], NULL, &rect, 0, NULL, 0);
-	/*SDL_RenderFillRect(renderer, &rect);*/
-
-	//for (int i = 0; i < 100; i++)
-	//{
-	//	SDL_Rect bearRect = { game->bears[i].x, game->bears[i].y, 64, 64 };
-	//	SDL_RenderCopy(renderer, game->bear, NULL, &bearRect);
-	//}
-
-
-
-	//We are done draing, 'present' or wshow to the screen what we've drawn
+	//We are done draing, 'present' or show to the screen what we've drawn
 	SDL_RenderPresent(renderer);
-
 }
 
 void process(GameState* game)
 {
-	Player *player = &game->player;
-	player->x += player->dx;
-	player->y += player->dy;
+	//add time
+	game->time++;
 
-	player->dy += GRAVITY;
+	if (game->time > 120)
+	{
+		Shutdown_status_lives(game);
+		game->statusState = STATUS_STATE_GAME;
+	}
+
+	if (game->statusState == STATUS_STATE_GAME)
+	{
+		//player movement
+		Player* player = &game->player;
+		player->x += player->dx;
+		player->y += player->dy;
+
+		//if (player->dx != 0 && player->onLedge && !player->slowingDown)
+		//{
+		//	if (game->time % 2 == 0)
+		//	{
+		//		if (player->animFrame == 0)
+		//		{
+		//			player->animFrame = 1;
+		//		}
+		//		else if (player->animFrame == 1)
+		//		{
+		//			player->animFrame = 2;
+		//		}
+		//		else if (player->animFrame == 2)
+		//		{
+		//			player->animFrame == 3;
+		//		}
+		//		else if (player->animFrame == 3)
+		//		{
+		//			player->animFrame == 4;
+		//		}
+		//		else
+		//		{
+		//			player->animFrame == 0;
+		//		}
+		//	}
+		//}
+
+		player->dy += GRAVITY;
+	}
+	
 }
 
 void CollisionDetect(GameState* game)
@@ -271,7 +532,7 @@ void CollisionDetect(GameState* game)
 		float fw = game->ledges[i].w;
 		float fh = game->ledges[i].h;
 
-		if (px + pw / 2 > fx && px + pw / 2 < px + pw)
+		if (px + pw / 2 > fx && px + pw / 2 < fx + fw)
 		{
 			//are we bumpibg our head?
 			if (py < fy + fh && py > fy && game->player.dy < 0)
@@ -329,8 +590,8 @@ void CollisionDetect(GameState* game)
 int main(int argc, char* args[])
 {
 	GameState game;
-	SDL_Window* window;
-	SDL_Renderer* renderer;
+	SDL_Window* window = NULL;
+	SDL_Renderer* renderer = NULL;
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 
@@ -342,8 +603,10 @@ int main(int argc, char* args[])
 								SDL_WINDOW_SHOWN); //Задаём окно
 
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
 	game.renderer = renderer;
+
+	//Initialize font system
+	TTF_Init();
 
 	LoadGame(&game);
 
@@ -363,13 +626,33 @@ int main(int argc, char* args[])
 		/*SDL_Delay(10);*/
 	}
 
-	ProcessEvents(window, renderer, done);
+	/*ProcessEvents(window, renderer, done);*/
 
-	SDL_DestroyTexture(game.bear);
+	//shutdown game and unload all memory
+	SDL_DestroyTexture(game.playerFrames[0]);
+	SDL_DestroyTexture(game.playerFrames[1]);
+	SDL_DestroyTexture(game.playerFrames[2]);
+	SDL_DestroyTexture(game.playerFrames[3]);
+	SDL_DestroyTexture(game.playerFrames[4]);
+	SDL_DestroyTexture(game.floor);
+	SDL_DestroyTexture(game.ustup);
+	SDL_DestroyTexture(game.fon);
+	SDL_DestroyTexture(game.platform);
+	SDL_DestroyTexture(game.box);
 
+	if (game.label != NULL)
+	{
+		SDL_DestroyTexture(game.label);
+	}
+	TTF_CloseFont(game.font);
+
+	//close and destroy the window
 	SDL_DestroyWindow(window);
 	SDL_DestroyRenderer(renderer);
 
+	TTF_Quit();
+
+	//Clean up
 	SDL_Quit();
 
 	return 0;

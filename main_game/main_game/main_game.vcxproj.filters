@@ -41,5 +41,20 @@
     <Image Include="floor.png">
       <Filter>Файлы ресурсов</Filter>
     </Image>
+    <Image Include="ustup.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="fon.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="platform.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="box.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Font Include="game_font.ttf" />
   </ItemGroup>
 </Project>
