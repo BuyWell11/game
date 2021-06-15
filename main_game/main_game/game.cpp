@@ -877,7 +877,7 @@ int main(int argc, char* args[])
 	sa.sin_family = AF_INET;
 	sa.sin_port = htons(8800);
 
-	sa.sin_addr.S_un.S_addr = inet_addr("192.168.3.10");
+	sa.sin_addr.S_un.S_addr = inet_addr("Put ID here");
 
 	if (connect(soc, (const SOCKADDR*)&sa, sizeof(sa)) != 0) {
 		printf("error to connect");
@@ -900,8 +900,8 @@ int main(int argc, char* args[])
 	window = SDL_CreateWindow("TheBestGame",
 		SDL_WINDOWPOS_UNDEFINED, // x
 		SDL_WINDOWPOS_UNDEFINED, // y
-		SCREEN_WIDTH, //ширина
-		SCREEN_HEIGHT, //высота
+		SCREEN_WIDTH, //ГёГЁГ°ГЁГ­Г 
+		SCREEN_HEIGHT, //ГўГ»Г±Г®ГІГ 
 		SDL_WINDOW_SHOWN);
 
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
