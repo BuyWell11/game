@@ -491,7 +491,7 @@ int ProcessEvents(SDL_Window* window, GameState* game)
 	if (state[SDL_SCANCODE_UP])
 	{
 		game->player[player_num].dy -= 0.2f;
-		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		
 		char buff[20] = { 0 };
 		char msg[256] = { 0 };
 		_itoa(game->player[player_num].x, buff, 10);
@@ -512,7 +512,7 @@ int ProcessEvents(SDL_Window* window, GameState* game)
 		}
 		game->player[player_num].facingLeft = 1;
 		game->player[player_num].slowingDown = 0;
-		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		
 		char buff[20] = { 0 };
 		char msg[256] = { 0 };
 		_itoa(game->player[player_num].x, buff, 10);
@@ -531,7 +531,7 @@ int ProcessEvents(SDL_Window* window, GameState* game)
 		}
 		game->player[player_num].facingLeft = 0;
 		game->player[player_num].slowingDown = 0;
-		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		
 		char buff[20] = { 0 };
 		char msg[256] = { 0 };
 		_itoa(game->player[player_num].x, buff, 10);
@@ -550,7 +550,7 @@ int ProcessEvents(SDL_Window* window, GameState* game)
 		{
 			game->player[player_num].dx = 0;
 		}
-		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+	
 		char buff[20] = { 0 };
 		char msg[256] = { 0 };
 		_itoa(game->player[player_num].x, buff, 10);
@@ -649,17 +649,25 @@ void DoRender(SDL_Renderer* renderer, GameState* game, int num)
 		//draw a rectangle at player's position
 		
 	}
-
+	
+	char buff[20] = { 0 };
+	char msg[256] = { 0 };
+	_itoa(game->player[player_num].x, buff, 10);
+	strcat(buff, " ");
+	strcat(msg, buff);
+	_itoa(game->player[player_num].y, buff, 10);
+	strcat(msg, buff);
+	send(soc, msg, sizeof(msg), NULL);
 	//We are done draing, 'present' or show to the screen what we've drawn
 	SDL_RenderPresent(renderer);
 }
 
-void process(GameState* game)
+void process(GameState* game,int player_num)
 {
 	//add time
 	game->time++;
 
-	if (game->time > 120)
+	if (game->time > 0)
 	{
 		Shutdown_status_lives(game);
 		game->statusState = STATUS_STATE_GAME;
@@ -668,33 +676,33 @@ void process(GameState* game)
 	if (game->statusState == STATUS_STATE_GAME)
 	{
 		//player movement
-		Player* player = &game->player;
-		player->x += player->dx;
-		player->y += player->dy;
+		
+		game->player[player_num].x += game->player[player_num].dx;
+		game->player[player_num].y += game->player[player_num].dy;
 
-		if (player->dx != 0 && player->onLedge && !player->slowingDown)
+		if (game->player[player_num].dx != 0 && game->player[player_num].onLedge && !game->player[player_num].slowingDown)
 		{
 			if (game->time % 8 == 0)
 			{
-				if (player->animFrame == 0)
+				if (game->player[player_num].animFrame == 0)
 				{
-					player->animFrame = 1;
+					game->player[player_num].animFrame = 1;
 				}
-				else if (player->animFrame == 1)
+				else if (game->player[player_num].animFrame == 1)
 				{
-					player->animFrame = 2;
+					game->player[player_num].animFrame = 2;
 				}
-				else if (player->animFrame == 2)
+				else if (game->player[player_num].animFrame == 2)
 				{
-					player->animFrame == 3;
+					game->player[player_num].animFrame == 3;
 				}
-				else if (player->animFrame == 3)
+				else if (game->player[player_num].animFrame == 3)
 				{
-					player->animFrame == 4;
+					game->player[player_num].animFrame == 4;
 				}
 				else
 				{
-					player->animFrame == 0;
+					game->player[player_num].animFrame == 0;
 				}
 			}
 		}
@@ -709,8 +717,8 @@ void process(GameState* game)
 
 		globalTime++;
 
-		player->dy += GRAVITY;
-		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
+		game->player[player_num].dy += GRAVITY;
+
 		char buff[20] = { 0 };
 		char msg[256] = { 0 };
 		_itoa(game->player[player_num].x, buff, 10);
@@ -913,10 +921,12 @@ int main(int argc, char* args[])
 	LoadGame(&game,player_num);
 
 	int done = 0;
+	SDL_CreateThread(process, NULL, (void*)&game, (void*)enemy_id);
+	SDL_CreateThread(CollisionDetect2, "collision", (void*)&game, (void*)enemy_id);
+	CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
 
 	while (!done)
 	{
-		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, NULL, NULL, NULL);
 		char buff[20] = { 0 };
 		char msg[256] = { 0 };
 		_itoa(game.player[player_num].x, buff, 10);
@@ -928,10 +938,12 @@ int main(int argc, char* args[])
 
 		//Check for events
 		done = ProcessEvents(window, &game);
+		
+		process(&game, player_num);
 
-		process(&game);
+		/*SDL_CreateThread(process, NULL,(void*)&game,(void*)1);*/
 		CollisionDetect(&game);
-		CollisionDetect2(&game, enemy_id);
+		/*CollisionDetect2(&game,enemy_id);*/
 
 		//render display
 		DoRender(renderer, &game,player_num);
